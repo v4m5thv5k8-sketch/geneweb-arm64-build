@@ -1,0 +1,73 @@
+name: Build GeneWeb ARM64
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: GeneWeb 7.1.0-beta2 ARM64
+    runs-on: ubuntu-22.04-arm
+
+    steps:
+      - name: Checkout GeneWeb
+        uses: actions/checkout@v4
+        with:
+          repository: geneweb/geneweb
+          ref: v7.1.0-beta2
+          path: geneweb
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            opam \
+            m4 \
+            pkg-config \
+            build-essential \
+            libgmp-dev \
+            libpcre2-dev
+
+      - name: Initialize opam
+        run: |
+          opam init --disable-sandboxing -y
+          opam switch create 4.14.2
+          eval "$(opam env)"
+
+      - name: Install GeneWeb dependencies
+        working-directory: geneweb
+        run: |
+          eval "$(opam env)"
+          opam install . --deps-only -y
+
+      - name: Configure GeneWeb
+        working-directory: geneweb
+        run: |
+          eval "$(opam env)"
+          ocaml ./configure.ml
+
+      - name: Build GeneWeb
+        working-directory: geneweb
+        run: |
+          eval "$(opam env)"
+          make distrib
+
+      - name: Check ARM64 binaries
+        working-directory: geneweb
+        run: |
+          file distribution/gw/gwd
+          file distribution/gw/gwsetup
+          file distribution/gw/gwc
+          file distribution/gw/gwu
+          distribution/gw/gwd -help >/dev/null
+          echo "GeneWeb ARM64 fonctionne."
+
+      - name: Package distribution
+        working-directory: geneweb
+        run: |
+          tar -czf ../geneweb-7.1.0-beta2-linux-arm64.tar.gz distribution
+
+      - name: Upload GeneWeb ARM64
+        uses: actions/upload-artifact@v4
+        with:
+          name: geneweb-7.1.0-beta2-linux-arm64
+          path: geneweb-7.1.0-beta2-linux-arm64.tar.gz
